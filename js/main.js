@@ -1,11 +1,10 @@
 (function () {
   "use strict";
 
-  /* Footer year */
   var yearEl = document.getElementById("year");
   if (yearEl) yearEl.textContent = new Date().getFullYear();
 
-  /* Mobile nav toggle */
+  /* Mobile nav */
   var navToggle = document.getElementById("navToggle");
   var mobileNav = document.getElementById("mobileNav");
   if (navToggle && mobileNav) {
@@ -25,107 +24,101 @@
   }
 
   /* Scroll reveal */
-  var revealTargets = document.querySelectorAll(
-    ".hero-copy, .hero-visual, .about-copy, .about-visual, .hours-tiles, .hours-week, .location-card, .location-map"
-  );
-  revealTargets.forEach(function (el) { el.setAttribute("data-reveal", ""); });
+  var revealTargets = document.querySelectorAll("[data-reveal]");
+  var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  var prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (prefersReducedMotion || !("IntersectionObserver" in window)) {
+  if (reducedMotion || !("IntersectionObserver" in window)) {
     revealTargets.forEach(function (el) { el.classList.add("is-visible"); });
   } else {
-    var observer = new IntersectionObserver(
-      function (entries) {
-        entries.forEach(function (entry) {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.15, rootMargin: "0px 0px -60px 0px" }
-    );
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: "0px 0px -50px 0px" });
     revealTargets.forEach(function (el) { observer.observe(el); });
   }
 
-  /* Store hours + live open/closed status (Port Moresby time, UTC+10, no DST) */
+  /* Store hours, Port Moresby time (UTC+10, no daylight saving) */
   var HOURS = {
-    0: { open: 15 * 60, close: 19 * 60 + 30 },       // Sunday
-    1: { open: 6 * 60 + 30, close: 19 * 60 + 30 },   // Monday
+    0: { open: 15 * 60, close: 19 * 60 + 30 },
+    1: { open: 6 * 60 + 30, close: 19 * 60 + 30 },
     2: { open: 6 * 60 + 30, close: 19 * 60 + 30 },
     3: { open: 6 * 60 + 30, close: 19 * 60 + 30 },
     4: { open: 6 * 60 + 30, close: 19 * 60 + 30 },
     5: { open: 6 * 60 + 30, close: 19 * 60 + 30 },
-    6: { open: 6 * 60 + 30, close: 19 * 60 + 30 }    // Saturday
+    6: { open: 6 * 60 + 30, close: 19 * 60 + 30 }
   };
-  var DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
   function formatTime(minutes) {
     var h = Math.floor(minutes / 60);
     var m = minutes % 60;
     var period = h >= 12 ? "PM" : "AM";
-    var h12 = h % 12;
-    if (h12 === 0) h12 = 12;
-    return h12 + (m ? ":" + String(m).padStart(2, "0") : ":00") + " " + period;
+    var h12 = h % 12 || 12;
+    return h12 + ":" + String(m).padStart(2, "0") + " " + period;
   }
 
-  function getPortMoresbyNow() {
+  function nowInPortMoresby() {
     try {
       var parts = new Intl.DateTimeFormat("en-US", {
         timeZone: "Pacific/Port_Moresby",
-        weekday: "short",
-        hour: "numeric",
-        minute: "numeric",
-        hour12: false
+        weekday: "short", hour: "numeric", minute: "numeric", hour12: false
       }).formatToParts(new Date());
 
-      var weekdayShort = "";
-      var hour = 0;
-      var minute = 0;
+      var weekday = "", hour = 0, minute = 0;
       parts.forEach(function (p) {
-        if (p.type === "weekday") weekdayShort = p.value;
+        if (p.type === "weekday") weekday = p.value;
         if (p.type === "hour") hour = parseInt(p.value, 10);
         if (p.type === "minute") minute = parseInt(p.value, 10);
       });
 
-      var weekdayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-      return { day: weekdayMap[weekdayShort], minutes: (hour % 24) * 60 + minute };
+      var map = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+      return { day: map[weekday], minutes: (hour % 24) * 60 + minute };
     } catch (e) {
       var now = new Date();
       return { day: now.getDay(), minutes: now.getHours() * 60 + now.getMinutes() };
     }
   }
 
+  function setText(id, text) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
+
   function updateStatus() {
-    var now = getPortMoresbyNow();
+    var now = nowInPortMoresby();
     var today = HOURS[now.day];
     var isOpen = now.minutes >= today.open && now.minutes < today.close;
 
-    var dot = document.getElementById("statusDot");
-    var label = document.getElementById("statusLabel");
-    var todayLine = document.getElementById("statusToday");
-
-    if (!dot || !label || !todayLine) return;
-
-    dot.classList.toggle("is-open", isOpen);
-    dot.classList.toggle("is-closed", !isOpen);
-
+    var detail;
     if (isOpen) {
-      label.textContent = "Open now";
-      todayLine.textContent = "Closes " + formatTime(today.close) + " today";
+      detail = "Closes " + formatTime(today.close) + " today";
+    } else if (now.minutes < today.open) {
+      detail = "Opens " + formatTime(today.open) + " today";
     } else {
-      label.textContent = "Closed now";
-      if (now.minutes < today.open) {
-        todayLine.textContent = "Opens " + formatTime(today.open) + " today";
-      } else {
-        var nextDay = (now.day + 1) % 7;
-        todayLine.textContent = "Opens " + formatTime(HOURS[nextDay].open) + " " + DAY_NAMES[nextDay];
-      }
+      var next = (now.day + 1) % 7;
+      detail = "Opens " + formatTime(HOURS[next].open) + " " + DAYS[next];
     }
 
-    var weekList = document.getElementById("hoursWeek");
-    if (weekList) {
-      weekList.querySelectorAll("li").forEach(function (li) {
+    var label = isOpen ? "Open now" : "Closed now";
+    setText("statusLabel", label);
+    setText("statusLabelLarge", label);
+    setText("statusToday", detail);
+    setText("statusTodayLarge", detail);
+    setText("statusWeekday", DAYS[now.day] + " hours: " + formatTime(today.open) + " to " + formatTime(today.close));
+
+    var dot = document.getElementById("statusDot");
+    if (dot) {
+      dot.classList.toggle("is-open", isOpen);
+      dot.classList.toggle("is-closed", !isOpen);
+    }
+
+    var week = document.getElementById("hoursWeek");
+    if (week) {
+      week.querySelectorAll("li").forEach(function (li) {
         li.classList.toggle("is-today", parseInt(li.getAttribute("data-day"), 10) === now.day);
       });
     }
