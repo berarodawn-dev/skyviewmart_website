@@ -27,9 +27,14 @@
   var revealTargets = document.querySelectorAll("[data-reveal]");
   var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  if (reducedMotion || !("IntersectionObserver" in window)) {
+  function revealAll() {
     revealTargets.forEach(function (el) { el.classList.add("is-visible"); });
+  }
+
+  if (reducedMotion || !("IntersectionObserver" in window)) {
+    revealAll();
   } else {
+    document.documentElement.classList.add("js-reveal");
     var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         if (entry.isIntersecting) {
@@ -39,6 +44,9 @@
       });
     }, { threshold: 0.12, rootMargin: "0px 0px -50px 0px" });
     revealTargets.forEach(function (el) { observer.observe(el); });
+
+    // Backstop: never leave content hidden if the observer does not run.
+    setTimeout(revealAll, 1500);
   }
 
   /* Store hours, Port Moresby time (UTC+10, no daylight saving) */
@@ -108,7 +116,6 @@
     setText("statusLabelLarge", label);
     setText("statusToday", detail);
     setText("statusTodayLarge", detail);
-    setText("statusWeekday", DAYS[now.day] + " hours: " + formatTime(today.open) + " to " + formatTime(today.close));
 
     var dot = document.getElementById("statusDot");
     if (dot) {
